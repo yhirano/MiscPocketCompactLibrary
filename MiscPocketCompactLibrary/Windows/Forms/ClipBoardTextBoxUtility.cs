@@ -22,31 +22,64 @@ namespace MiscPocketCompactLibrary.Windows.Forms
 
         public static void Cut(TextBox tb)
         {
-            if (tb != null && tb.SelectionLength > 0)
+            try
             {
-                Clipboard.SetText(tb.SelectedText);
-                tb.SelectedText = "";
+                if (tb != null && tb.SelectionLength > 0)
+                {
+                    Clipboard.SetText(tb.SelectedText);
+                    tb.SelectedText = "";
+                }
+            }
+            catch (ArgumentException)
+            {
+                ;
+            }
+            catch (System.Runtime.InteropServices.ExternalException e)
+            {
+                MessageBox.Show(e.Message, "警告");
             }
         }
 
         public static void Copy(TextBox tb)
         {
-            if (tb != null && tb.SelectionLength > 0)
+            try
             {
-                Clipboard.SetText(tb.SelectedText);
+                if (tb != null && tb.SelectionLength > 0)
+                {
+                    Clipboard.SetText(tb.SelectedText);
+                }
+            }
+            catch (ArgumentException)
+            {
+                ;
+            }
+            catch (System.Runtime.InteropServices.ExternalException e)
+            {
+                MessageBox.Show(e.Message, "警告");
             }
         }
 
         public static void Paste(TextBox tb)
         {
-            string clipboardText = Clipboard.GetText();
-            if (tb != null && clipboardText != null)
+            try
             {
-                string before = tb.Text.Substring(0, tb.SelectionStart);
-                string after = 
-                    tb.Text.Substring(
-                    tb.SelectionStart + tb.SelectionLength, tb.TextLength - (tb.SelectionStart + tb.SelectionLength));
-                tb.Text = before + clipboardText + after;
+                string clipboardText = Clipboard.GetText();
+                if (tb != null && clipboardText != null)
+                {
+                    string before = tb.Text.Substring(0, tb.SelectionStart);
+                    string after =
+                        tb.Text.Substring(
+                        tb.SelectionStart + tb.SelectionLength, tb.TextLength - (tb.SelectionStart + tb.SelectionLength));
+                    tb.Text = before + clipboardText + after;
+                }
+            }
+            catch (ArgumentException)
+            {
+                ;
+            }
+            catch (System.Runtime.InteropServices.ExternalException e)
+            {
+                MessageBox.Show(e.Message, "警告");
             }
         }
     }
