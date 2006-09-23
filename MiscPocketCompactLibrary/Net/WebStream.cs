@@ -18,6 +18,24 @@ namespace MiscPocketCompactLibrary.Net
     public class WebStream
     {
         /// <summary>
+        /// ダウンロード進捗の最小値（0）をセットするデリゲート
+        /// </summary>
+        /// <param name="minimum">ダウンロード進捗の最小値</param>
+        public delegate void SetDownloadProgressMinimumInvoker(int minimum);
+
+        /// <summary>
+        /// ダウンロード進捗の最大値（ファイルサイズ）をセットするデリゲート
+        /// </summary>
+        /// <param name="maximum">ダウンロードの進捗の最大値</param>
+        public delegate void SetDownloadProgressMaximumInvoker(int maximum);
+
+        /// <summary>
+        /// ダウンロード進捗の状況（すでにダウンロードしたファイルサイズ）をセットするデリゲート
+        /// </summary>
+        /// <param name="value">ダウンロード進捗の状況</param>
+        public delegate void SetDownloadProgressValueInvoker(int value);
+
+        /// <summary>
         /// URL
         /// </summary>
         private Uri url;
@@ -88,7 +106,8 @@ namespace MiscPocketCompactLibrary.Net
         /// </summary>
         public int ProxyPort
         {
-            get {
+            get
+            {
                 if (0x00 <= proxyPort && proxyPort <= 0xFFFF)
                 {
                     return proxyPort;
@@ -98,7 +117,8 @@ namespace MiscPocketCompactLibrary.Net
                     return 0;
                 }
             }
-            set {
+            set
+            {
                 if (0x00 <= value && value <= 0xFFFF)
                 {
                     proxyPort = value;
@@ -113,7 +133,7 @@ namespace MiscPocketCompactLibrary.Net
         /// <summary>
         /// ダウンロード時のバッファサイズ
         /// </summary>
-        private static long downLoadBufferSize = 0x1FFFF; // 128KB
+        private static long downLoadBufferSize = 1024;
 
         /// <summary>
         /// ダウンロード時のバッファサイズ
@@ -122,18 +142,18 @@ namespace MiscPocketCompactLibrary.Net
         {
             get
             {
-                if (0xFFFF <= downLoadBufferSize && downLoadBufferSize <= 0x3FFFF)
+                if (512 <= downLoadBufferSize && downLoadBufferSize <= 2048)
                 {
                     return downLoadBufferSize;
                 }
                 else
                 {
-                    return 0x1FFFF;
+                    return 2048;
                 }
             }
             set
             {
-                if (0xFFFF <= value && value <= 0x3FFFF)
+                if (512 <= value && value <= 2048)
                 {
                     downLoadBufferSize = value;
                 }
@@ -143,6 +163,13 @@ namespace MiscPocketCompactLibrary.Net
                 }
             }
         }
+
+        /// <summary>
+        /// ダウンロードするファイルのサイズ。
+        /// GetWebStream()実行時にファイルサイズが分かるので、
+        /// GetWebStream()実行前では0が返る。
+        /// </summary>
+        private long contentLength = 0;
 
         /// <summary>
         /// コンストラクタ
@@ -189,6 +216,7 @@ namespace MiscPocketCompactLibrary.Net
                 }
 
                 WebResponse result = req.GetResponse();
+                contentLength = result.ContentLength;
                 st = result.GetResponseStream();
             }
             catch (WebException)
@@ -221,6 +249,52 @@ namespace MiscPocketCompactLibrary.Net
         /// <param name="fileName">保存先のファイル名</param>
         public void FetchFile(string fileName)
         {
+            try
+            {
+                FetchFile(fileName, null, null, null);
+            }
+            catch (WebException)
+            {
+                throw;
+            }
+            catch (OutOfMemoryException)
+            {
+                throw;
+            }
+            catch (IOException)
+            {
+                throw;
+            }
+            catch (UriFormatException)
+            {
+                throw;
+            }
+            catch (SocketException)
+            {
+                throw;
+            }
+            catch (ArgumentException)
+            {
+                throw;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// ネット上からファイルをダウンロードする
+        /// </summary>
+        /// <param name="fileName">保存先のファイル名</param>
+        /// <param name="doDownloadProgressMinimum">ファイルサイズの最小値（0）をセットするデリゲート</param>
+        /// <param name="doSetDownloadProgressMaximum">ファイルサイズをセットするデリゲート</param>
+        /// <param name="doSetDownloadProgressValue">ダウンロード済みのファイルサイズをセットするデリゲート</param>
+        public void FetchFile(string fileName,
+            SetDownloadProgressMinimumInvoker doDownloadProgressMinimum,
+            SetDownloadProgressMaximumInvoker doSetDownloadProgressMaximum,
+            SetDownloadProgressValueInvoker doSetDownloadProgressValue)
+        {
             Stream st = null;
             FileStream fs = null;
 
@@ -229,14 +303,40 @@ namespace MiscPocketCompactLibrary.Net
                 st = GetWebStream();
                 fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
 
+                int maximum  = (int)contentLength;
+
+                if (doDownloadProgressMinimum != null)
+                {
+                    doDownloadProgressMinimum(0);
+                }
+
+                if (doSetDownloadProgressMaximum != null)
+                {
+                    doSetDownloadProgressMaximum(maximum);
+                }
+
                 // 応答データをファイルに書き込む
                 Byte[] buf = new Byte[DownLoadBufferSize];
                 int count = 0;
+                int alreadyWrite = 0;
 
                 do
                 {
                     count = st.Read(buf, 0, buf.Length);
                     fs.Write(buf, 0, count);
+                    // すでに読み込んだファイルサイズ
+                    alreadyWrite += count;
+
+                    // すでに読み込んだファイルサイズが全体のファイルサイズより大きくなることは
+                    // 無いはずだが、一応チェックする
+                    if (alreadyWrite < maximum)
+                    {
+                        if (doSetDownloadProgressValue != null)
+                        {
+                            doSetDownloadProgressValue(alreadyWrite);
+                        }
+                    }
+
                 } while (count != 0);
             }
             catch (WebException)
