@@ -66,11 +66,15 @@ namespace MiscPocketCompactLibrary.Windows.Forms
                 string clipboardText = Clipboard.GetText();
                 if (tb != null && clipboardText != null)
                 {
+                    // 選択部分より前の文字列
                     string before = tb.Text.Substring(0, tb.SelectionStart);
+                    // 選択部分より後の文字列
                     string after =
                         tb.Text.Substring(
                         tb.SelectionStart + tb.SelectionLength, tb.TextLength - (tb.SelectionStart + tb.SelectionLength));
                     tb.Text = before + clipboardText + after;
+                    // カーソル位置を貼り付けた内容の最後に持ってくる
+                    tb.SelectionStart = before.Length + clipboardText.Length;
                 }
             }
             catch (ArgumentException)
