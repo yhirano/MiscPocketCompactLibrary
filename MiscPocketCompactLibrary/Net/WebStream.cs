@@ -69,14 +69,22 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
-        /// プロキシを使うか
+        /// プロキシの接続方法列挙
         /// </summary>
-        private bool proxyUse = false;
+        public enum ProxyConnect
+        {
+            Unuse, OsSetting, OriginalSetting
+        }
 
         /// <summary>
         /// プロキシを使うか
         /// </summary>
-        public bool ProxyUse
+        private ProxyConnect proxyUse = ProxyConnect.OsSetting;
+
+        /// <summary>
+        /// プロキシを使うか
+        /// </summary>
+        public ProxyConnect ProxyUse
         {
             get { return proxyUse; }
             set { proxyUse = value; }
@@ -209,10 +217,17 @@ namespace MiscPocketCompactLibrary.Net
                     ((HttpWebRequest)req).UserAgent = UserAgent;
 
                     // プロキシの設定が存在した場合、プロキシを設定
-                    if (ProxyUse == true && ProxyServer.Length != 0)
+                    if (ProxyUse == ProxyConnect.OriginalSetting && ProxyServer.Length != 0)
                     {
                         ((HttpWebRequest)req).Proxy =
                             new WebProxy(ProxyServer, ProxyPort);
+                    }
+                    // プロキシ設定を使わない場合
+                    else if(ProxyUse == ProxyConnect.Unuse)
+                    {
+                        WebProxy proxy = new WebProxy();
+                        proxy.Address = null;
+                        ((HttpWebRequest)req).Proxy = proxy;
                     }
                 }
 
