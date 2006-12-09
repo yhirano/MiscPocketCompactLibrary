@@ -49,6 +49,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Diagnostics\Log.cs" />
     <Compile Include="Net\WebStream.cs" />
     <Compile Include="Reflection\AssemblyUtility.cs" />
     <Compile Include="Runtime\InteropServices\MarshalEx.cs" />

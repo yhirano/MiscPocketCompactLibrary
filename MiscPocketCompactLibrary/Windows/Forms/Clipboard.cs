@@ -9,6 +9,8 @@ using System.IO;
 //using OpenNETCF.Runtime.InteropServices;
 using MiscPocketCompactLibrary.Runtime.InteropServices;
 
+// This source is based OpenNetCF 1.4  OpenNETCF.Windows.Forms.Clipboard Class.
+// Rename namespace and comment out some 'using' for other sourcees include.
 namespace MiscPocketCompactLibrary.Windows.Forms
 {
     /// <summary>
