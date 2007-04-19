@@ -27,6 +27,40 @@ namespace MiscPocketCompactLibrary.Windows.Forms
         private int dist_bottom = 0;
 
         /// <summary>
+        /// 親コントロールのベースサイズ（横幅）
+        /// </summary>
+        private int parentControlWidth;
+
+        /// <summary>
+        /// 親コントロールのベースサイズ（横幅）
+        /// </summary>
+        public int ParentControlWidth
+        {
+            set
+            {
+                parentControlWidth = value;
+                UpdateDistances();
+            }
+        }
+
+        /// <summary>
+        /// 親コントロールのベースサイズ（高さ）
+        /// </summary>
+        private int parentControlHeight;
+
+        /// <summary>
+        /// 親コントロールのベースサイズ（高さ）
+        /// </summary>
+        public int ParentControlHeight
+        {
+            set
+            {
+                parentControlHeight = value;
+                UpdateDistances();
+            }
+        }
+
+        /// <summary>
         /// アンカー
         /// </summary>
         public AnchorStyles Anchor
@@ -50,9 +84,23 @@ namespace MiscPocketCompactLibrary.Windows.Forms
         /// <param name="control">アンカーを設定するコントロール</param>
         /// <param name="anchor">アンカー</param>
         public AnchorLayout(Control control, AnchorStyles anchor)
+            : this(control, anchor, control.Parent.ClientSize.Width, control.Parent.ClientSize.Height)
+        {
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="control">アンカーを設定するコントロール</param>
+        /// <param name="anchor">アンカー</param>
+        /// <param name="parentControlWidth">親コントロールのベースサイズ（横幅）</param>
+        /// <param name="parentControlHeight">親コントロールのベースサイズ（高さ）</param>
+        public AnchorLayout(Control control, AnchorStyles anchor, int parentControlWidth, int parentControlHeight)
         {
             this.control = control;
             this.anchor = anchor;
+            this.parentControlWidth = parentControlWidth;
+            this.parentControlHeight = parentControlHeight;
 
             UpdateDistances();
         }
@@ -129,11 +177,11 @@ namespace MiscPocketCompactLibrary.Windows.Forms
             {
                 if (control.Width > 0)
                 {
-                    dist_right = control.Parent.ClientSize.Width - control.Left - control.Width;
+                    dist_right = parentControlWidth - control.Left - control.Width;
                 }
                 if (control.Height > 0)
                 {
-                    dist_bottom = control.Parent.ClientSize.Height - control.Top - control.Height;
+                    dist_bottom = parentControlHeight - control.Top - control.Height;
                 }
             }
         }
