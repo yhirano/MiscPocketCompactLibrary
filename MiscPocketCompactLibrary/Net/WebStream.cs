@@ -13,7 +13,7 @@ using System.Xml;
 namespace MiscPocketCompactLibrary.Net
 {
     /// <summary>
-    /// WebStream の概要の説明です。
+    /// Webにある情報やファイルを取得するためのクラス
     /// </summary>
     public class WebStream
     {
@@ -41,6 +41,20 @@ namespace MiscPocketCompactLibrary.Net
         private Uri url;
 
         /// <summary>
+        /// リクエストメソッド
+        /// </summary>
+        private string method = string.Empty;
+
+        /// <summary>
+        /// リクエストメソッド
+        /// </summary>
+        public string Method
+        {
+            get { return method; }
+            set { method = value; }
+        }
+
+        /// <summary>
         /// 接続のタイムアウト時間
         /// </summary>
         int timeOut = 20000;
@@ -57,7 +71,7 @@ namespace MiscPocketCompactLibrary.Net
         /// <summary>
         /// ユーザーエージェント情報
         /// </summary>
-        private string userAgent = "";
+        private string userAgent = string.Empty;
 
         /// <summary>
         /// ユーザーエージェント情報
@@ -93,7 +107,7 @@ namespace MiscPocketCompactLibrary.Net
         /// <summary>
         /// プロキシサーバ
         /// </summary>
-        private string proxyServer = "";
+        private string proxyServer = string.Empty;
 
         /// <summary>
         /// プロキシサーバ
@@ -174,6 +188,25 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
+        /// Web認証情報
+        /// </summary>
+        NetworkCredential credential;
+
+        /// <summary>
+        /// Web認証情報
+        /// </summary>
+        public NetworkCredential Credential
+        {
+            get { return credential; }
+            set { credential = value; }
+        }
+
+        /// <summary>
+        /// Webヘッダのコレクション
+        /// </summary>
+        WebHeaderCollection headers = new WebHeaderCollection();
+
+        /// <summary>
         /// ダウンロードするファイルのサイズ。
         /// GetWebStream()実行時にファイルサイズが分かるので、
         /// GetWebStream()実行前では0が返る。
@@ -187,6 +220,56 @@ namespace MiscPocketCompactLibrary.Net
         public WebStream(Uri url)
         {
             this.url = url;
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="url">URL</param>
+        /// <param name="credential">Web認証情報</param>
+        public WebStream(Uri url, NetworkCredential credential)
+        {
+            this.url = url;
+            this.credential = credential;
+        }
+
+        /// <summary>
+        /// コンストラクタ
+        /// </summary>
+        /// <param name="url">URL</param>
+        /// <param name="userName">Web認証のユーザ名</param>
+        /// <param name="password">Web認証のパスワード</param>
+        public WebStream(Uri url, string userName, string password)
+        {
+            this.url = url;
+            credential = new NetworkCredential(userName, password);
+        }
+
+        /// <summary>
+        /// Web認証情報を削除
+        /// </summary>
+        public void RemoveCredential()
+        {
+            credential = null;
+        }
+
+        /// <summary>
+        /// ヘッダを追加する
+        /// </summary>
+        /// <param name="header">ヘッダの情報</param>
+        public void AddHeader(string header)
+        {
+            headers.Add(header);
+        }
+
+        /// <summary>
+        /// ヘッダを追加する
+        /// </summary>
+        /// <param name="name">ヘッダの名前</param>
+        /// <param name="value">ヘッダの値</param>
+        public void AddHeader(string name, string value)
+        {
+            headers.Add(name, value);
         }
 
         /// <summary>
@@ -210,6 +293,12 @@ namespace MiscPocketCompactLibrary.Net
                 WebRequest req = WebRequest.Create(url);
                 req.Timeout = TimeOut;
 
+                // リクエストメソッドの設定
+                if (Method != null && Method != string.Empty)
+                {
+                    req.Method = Method;
+                }
+
                 // HTTPプロトコルでネットにアクセスする場合
                 if (req.GetType() == typeof(System.Net.HttpWebRequest))
                 {
@@ -223,11 +312,20 @@ namespace MiscPocketCompactLibrary.Net
                             new WebProxy(ProxyServer, ProxyPort);
                     }
                     // プロキシ設定を使わない場合
-                    else if(ProxyUse == ProxyConnect.Unuse)
+                    else if (ProxyUse == ProxyConnect.Unuse)
                     {
                         WebProxy proxy = new WebProxy();
                         proxy.Address = null;
                         ((HttpWebRequest)req).Proxy = proxy;
+                    }
+
+                    // ヘッダーを追加する
+                    req.Headers.Add(headers);
+
+                    // Web認証でアクセスする場合は
+                    if (credential != null)
+                    {
+                        req.Credentials = credential;
                     }
                 }
 
@@ -319,7 +417,7 @@ namespace MiscPocketCompactLibrary.Net
                 st = GetWebStream();
                 fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
 
-                int maximum  = (int)contentLength;
+                int maximum = (int)contentLength;
 
                 if (doDownloadProgressMinimum != null)
                 {
