@@ -15,8 +15,18 @@ namespace MiscPocketCompactLibrary.Net
     /// <summary>
     /// Webにある情報やファイルを取得するためのクラス
     /// </summary>
-    public class WebStream
+    public class WebStream : Stream
     {
+        /// <summary>
+        /// ストリーム
+        /// </summary>
+        private Stream st;
+
+        /// <summary>
+        /// Webレスポンス
+        /// </summary>
+        private WebResponse webres;
+
         /// <summary>
         /// ダウンロード進捗の最小値（0）をセットするデリゲート
         /// </summary>
@@ -276,18 +286,15 @@ namespace MiscPocketCompactLibrary.Net
         /// HTTPレスポンスをストリームとして返す。
         /// </summary>
         /// <returns>HTTPレスポンスのストリーム</returns>
-        public Stream GetWebStream()
+        public void CreateWebStream()
         {
-            Stream st = null;
-            FileStream fs = null;
-
             try
             {
                 // Urlがファイル指定の場合はfile streamを返す
                 if (url.IsFile == true)
                 {
-                    fs = new FileStream(url.LocalPath, FileMode.Open, FileAccess.Read);
-                    return fs;
+                    st = new FileStream(url.LocalPath, FileMode.Open, FileAccess.Read);
+                    return;
                 }
 
                 WebRequest req = WebRequest.Create(url);
@@ -329,9 +336,9 @@ namespace MiscPocketCompactLibrary.Net
                     }
                 }
 
-                WebResponse result = req.GetResponse();
-                contentLength = result.ContentLength;
-                st = result.GetResponseStream();
+                webres = req.GetResponse();
+                contentLength = webres.ContentLength;
+                st = webres.GetResponseStream();
             }
             catch (WebException)
             {
@@ -353,8 +360,6 @@ namespace MiscPocketCompactLibrary.Net
             {
                 throw;
             }
-
-            return st;
         }
 
         /// <summary>
@@ -409,12 +414,10 @@ namespace MiscPocketCompactLibrary.Net
             SetDownloadProgressMaximumInvoker doSetDownloadProgressMaximum,
             SetDownloadProgressValueInvoker doSetDownloadProgressValue)
         {
-            Stream st = null;
             FileStream fs = null;
 
             try
             {
-                st = GetWebStream();
                 fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
 
                 int maximum = (int)contentLength;
@@ -487,11 +490,130 @@ namespace MiscPocketCompactLibrary.Net
                 {
                     fs.Close();
                 }
-                if (st != null)
-                {
-                    st.Close();
-                }
             }
+        }
+
+        /// <summary>
+        /// ストリームが読み取りをサポートするかどうかを示す値を取得します。
+        /// </summary>
+        public override bool CanRead
+        {
+            get
+            {
+                return st.CanRead;
+            }
+        }
+
+        /// <summary>
+        /// ストリームがシークをサポートするかどうかを示す値を取得します。
+        /// </summary>
+        public override bool CanSeek
+        {
+            get
+            {
+                return st.CanSeek;
+            }
+        }
+
+        /// <summary>
+        /// ストリームが書き込みをサポートするかどうかを示す値を取得します。
+        /// </summary>
+        public override bool CanWrite
+        {
+            get { return st.CanWrite; }
+        }
+
+        /// <summary>
+        /// ストリームに対応するすべてのバッファをクリアし、バッファ内のデータを基になるデバイスに書き込みます。 
+        /// </summary>
+        public override void Flush()
+        {
+            st.Flush();
+        }
+
+        /// <summary>
+        /// ストリームの長さをバイト単位で取得します。
+        /// </summary>
+        public override long Length
+        {
+            get
+            {
+                return st.Length;
+            }
+        }
+
+        /// <summary>
+        /// ストリーム内の位置を取得または設定します。
+        /// </summary>
+        public override long Position
+        {
+            get
+            {
+                return st.Position;
+            }
+            set
+            {
+                st.Position = value;
+            }
+        }
+
+        /// <summary>
+        /// ストリームからバイト シーケンスを読み取り、読み取ったバイト数の分だけストリームの位置を進めます。 
+        /// </summary>
+        /// <param name="buffer">バイト配列。このメソッドが戻るとき、指定したバイト配列の offset から (offset + count -1) までの値が、現在のソースから読み取られたバイトに置き換えられます。</param>
+        /// <param name="offset">ストリームから読み取ったデータの格納を開始する位置を示す buffer内のバイト オフセット。インデックス番号は 0 から始まります。</param>
+        /// <param name="count">ストリームから読み取る最大バイト数。</param>
+        /// <returns>バッファに読み取られた合計バイト数。要求しただけのバイト数を読み取ることができなかった場合、この値は要求したバイト数より小さくなります。ストリームの末尾に到達した場合は 0 (ゼロ) になることがあります。</returns>
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            return st.Read(buffer, offset, count);
+        }
+
+        /// <summary>
+        /// ストリーム内の位置を設定します。 
+        /// </summary>
+        /// <param name="offset">origin パラメータからのバイト オフセット。 </param>
+        /// <param name="origin">新しい位置を取得するために使用する参照ポイントを示す SeekOrigin 型の値。 </param>
+        /// <returns>現在のストリーム内の新しい位置。</returns>
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            return st.Seek(offset, origin);
+        }
+
+        /// <summary>
+        /// ストリームの長さを設定します。 
+        /// </summary>
+        /// <param name="value">ストリームの希望の長さ (バイト数)。 </param>
+        public override void SetLength(long value)
+        {
+            st.SetLength(value);
+        }
+
+        /// <summary>
+        /// ストリームにバイト シーケンスを書き込み、書き込んだバイト数の分だけストリームの現在位置を進めます。
+        /// </summary>
+        /// <param name="buffer">バイト配列。このメソッドは、buffer から現在のストリームに、count で指定されたバイト数だけコピーします。</param>
+        /// <param name="offset">現在のストリームへのバイトのコピーを開始する位置を示す buffer 内のバイト オフセット。インデックス番号は 0 から始まります。</param>
+        /// <param name="count">現在のストリームに書き込むバイト数。</param>
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            st.Write(buffer, offset, count);
+        }
+
+        /// <summary>
+        /// ストリームに関連付けられているすべてのリソース (ソケット、ファイル ハンドルなど) を解放します。
+        /// </summary>
+        public override void Close()
+        {
+            if (webres != null)
+            {
+                webres.Close();
+            }
+            if (st != null)
+            {
+                st.Close();
+            }
+            base.Close();
         }
     }
 }
