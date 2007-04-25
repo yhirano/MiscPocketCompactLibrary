@@ -93,14 +93,14 @@ namespace MiscPocketCompactLibrary.Windows.Forms
         /// </summary>
         /// <param name="control">アンカーを設定するコントロール</param>
         /// <param name="anchor">アンカー</param>
-        /// <param name="parentControlWidth">親コントロールのベースサイズ（横幅）</param>
-        /// <param name="parentControlHeight">親コントロールのベースサイズ（高さ）</param>
-        public AnchorLayout(Control control, AnchorStyles anchor, int parentControlWidth, int parentControlHeight)
+        /// <param name="parentControlBaseWidth">親コントロールのベースサイズ（横幅）</param>
+        /// <param name="parentControlBaseHeight">親コントロールのベースサイズ（高さ）</param>
+        public AnchorLayout(Control control, AnchorStyles anchor, int parentControlBaseWidth, int parentControlBaseHeight)
         {
             this.control = control;
             this.anchor = anchor;
-            this.parentControlWidth = parentControlWidth;
-            this.parentControlHeight = parentControlHeight;
+            this.parentControlWidth = parentControlBaseWidth;
+            this.parentControlHeight = parentControlBaseHeight;
 
             UpdateDistances();
         }
@@ -109,6 +109,16 @@ namespace MiscPocketCompactLibrary.Windows.Forms
         /// コントロールをアンカーに従ってレイアウトし直す
         /// </summary>
         public void LayoutControl()
+        {
+            LayoutControl(control.Parent.ClientRectangle.Width, control.Parent.ClientRectangle.Height);
+        }
+
+        /// <summary>
+        /// コントロールをアンカーに従ってレイアウトし直す
+        /// </summary>
+        /// <param name="parentClientWidth">レイアウトし直す親コントロールの領域の横幅</param>
+        /// <param name="parentClientHeight">レイアウトし直す親コントロールの領域の高さ</param>
+        public void LayoutControl(int parentClientWidth, int parentClientHeight)
         {
             if (control.Parent == null)
             {
@@ -124,32 +134,32 @@ namespace MiscPocketCompactLibrary.Windows.Forms
             {
                 if ((anchor & AnchorStyles.Left) != 0)
                 {
-                    controlWidth = control.Parent.ClientRectangle.Width - dist_right - controlLeft;
+                    controlWidth = parentClientWidth - dist_right - controlLeft;
                 }
                 else
                 {
-                    controlLeft = control.Parent.ClientRectangle.Width - dist_right - controlWidth;
+                    controlLeft = parentClientWidth - dist_right - controlWidth;
                 }
             }
             else if ((anchor & AnchorStyles.Left) == 0)
             {
-                controlLeft = controlLeft + (control.Parent.ClientRectangle.Width - (controlLeft + controlWidth + dist_right)) / 2;
+                controlLeft = controlLeft + (parentClientWidth - (controlLeft + controlWidth + dist_right)) / 2;
             }
 
             if ((anchor & AnchorStyles.Bottom) != 0)
             {
                 if ((anchor & AnchorStyles.Top) != 0)
                 {
-                    controlHeight = control.Parent.ClientRectangle.Height - dist_bottom - controlTop;
+                    controlHeight = parentClientHeight - dist_bottom - controlTop;
                 }
                 else
                 {
-                    controlTop = control.Parent.ClientRectangle.Height - dist_bottom - controlHeight;
+                    controlTop = parentClientHeight - dist_bottom - controlHeight;
                 }
             }
             else if ((anchor & AnchorStyles.Top) == 0)
             {
-                controlTop = controlTop + (control.Parent.ClientRectangle.Height - (controlTop + controlHeight + dist_bottom)) / 2;
+                controlTop = controlTop + (parentClientHeight - (controlTop + controlHeight + dist_bottom)) / 2;
             }
 
             if (controlWidth < 0)
