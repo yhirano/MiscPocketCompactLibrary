@@ -92,12 +92,11 @@ namespace MiscPocketCompactLibrary.Diagnostics
         /// <param name="logText">書き出す内容</param>
         private void AppendToFile(string logPath, string logText)
         {
+            StreamWriter sw=null;
             try
             {
-                StreamWriter sw;
                 sw = File.AppendText(logPath);
                 sw.WriteLine(logText);
-                sw.Close();
             }
             catch (UnauthorizedAccessException)
             {
@@ -115,11 +114,20 @@ namespace MiscPocketCompactLibrary.Diagnostics
             {
                 ;
             }
-            catch (DirectoryNotFoundException) {
+            catch (DirectoryNotFoundException)
+            {
                 ;
             }
-            catch (NotSupportedException) {
+            catch (NotSupportedException)
+            {
                 ;
+            }
+            finally
+            {
+                if (sw != null)
+                {
+                    sw.Close();
+                }
             }
         }
     }
