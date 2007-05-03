@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Diagnostics\Log.cs" />
+    <Compile Include="Net\AlreadyFetchFileException.cs" />
     <Compile Include="Net\WebStream.cs" />
     <Compile Include="Reflection\AssemblyUtility.cs" />
     <Compile Include="Runtime\InteropServices\MarshalEx.cs" />

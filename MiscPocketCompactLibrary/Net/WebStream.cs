@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Collections;
 using System.Xml;
+using System.Text.RegularExpressions;
 
 #endregion
 
@@ -220,8 +221,25 @@ namespace MiscPocketCompactLibrary.Net
         /// ダウンロードするファイルのサイズ。
         /// GetWebStream()実行時にファイルサイズが分かるので、
         /// GetWebStream()実行前では0が返る。
+        /// リジュームの場合は残りのダウンロードサイズとなる。
         /// </summary>
         private long contentLength = 0;
+
+        /// <summary>
+        /// ストリーム全体のファイルサイズ。
+        /// リジュームの場合も全体のファイルサイズ。
+        /// </summary>
+        private long streamLength = 0;
+
+        /// <summary>
+        /// リジュームをするか
+        /// </summary>
+        private bool resume;
+
+        /// <summary>
+        /// ファイルレジュームの位置（すでに取得しているバイト数）
+        /// </summary>
+        private long alreadyGetFile = 0;
 
         /// <summary>
         /// コンストラクタ
@@ -283,6 +301,40 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
+        /// レジュームをするようにセットする
+        /// </summary>
+        /// <param name="fileName">レジュームをするファイル名</param>
+        public void SetResume(string fileName)
+        {
+            if (File.Exists(fileName) == false)
+            {
+                resume = false;
+                return;
+            }
+
+            alreadyGetFile = (new System.IO.FileInfo(fileName)).Length;
+
+            // ファイルがあって、かつファイルの長さが0でない場合にレジュームフラグを立てる
+            if (alreadyGetFile == 0)
+            {
+                resume = false;
+            }
+            else
+            {
+                resume = true;
+            }
+        }
+
+        /// <summary>
+        /// レジュームをしないようにする
+        /// </summary>
+        public void RemoveResume()
+        {
+            alreadyGetFile = 0;
+            resume = false;
+        }
+
+        /// <summary>
         /// HTTPレスポンスをストリームとして返す。
         /// </summary>
         /// <returns>HTTPレスポンスのストリーム</returns>
@@ -297,42 +349,40 @@ namespace MiscPocketCompactLibrary.Net
                     return;
                 }
 
-                WebRequest req = WebRequest.Create(url);
-                req.Timeout = TimeOut;
-
-                // リクエストメソッドの設定
-                if (Method != null && Method != string.Empty)
+                #region ストリーム全体のファイルサイズを得る
+                WebResponse tempRes = null;
+                try
                 {
-                    req.Method = Method;
+                    // ストリーム全体のファイルサイズを得る
+                    WebRequest tempReq = MakeHttpWebRequest();
+                    tempRes = tempReq.GetResponse();
+                    streamLength = tempRes.ContentLength;
+                }
+                finally
+                {
+                    if (tempRes != null)
+                    {
+                        tempRes.Close();
+                    }
+                }
+                #endregion
+
+                // すでにストリームのファイルが存在する場合
+                if (resume == true && streamLength == alreadyGetFile)
+                {
+                    throw new AlreadyFetchFileException();
                 }
 
-                // HTTPプロトコルでネットにアクセスする場合
-                if (req.GetType() == typeof(System.Net.HttpWebRequest))
+                // Webリクエストを作成する
+                WebRequest req = MakeHttpWebRequest();
+
+                if (req is HttpWebRequest)
                 {
-                    // UserAgentを付加
-                    ((HttpWebRequest)req).UserAgent = UserAgent;
-
-                    // プロキシの設定が存在した場合、プロキシを設定
-                    if (ProxyUse == ProxyConnect.OriginalSetting && ProxyServer.Length != 0)
+                    // レジュームの指定がされている場合は
+                    if (resume == true)
                     {
-                        ((HttpWebRequest)req).Proxy =
-                            new WebProxy(ProxyServer, ProxyPort);
-                    }
-                    // プロキシ設定を使わない場合
-                    else if (ProxyUse == ProxyConnect.Unuse)
-                    {
-                        WebProxy proxy = new WebProxy();
-                        proxy.Address = null;
-                        ((HttpWebRequest)req).Proxy = proxy;
-                    }
-
-                    // ヘッダーを追加する
-                    req.Headers.Add(headers);
-
-                    // Web認証でアクセスする場合は
-                    if (credential != null)
-                    {
-                        req.Credentials = credential;
+                        // バイトレンジを指定する
+                        ((HttpWebRequest)req).AddRange((int)alreadyGetFile);
                     }
                 }
 
@@ -360,6 +410,58 @@ namespace MiscPocketCompactLibrary.Net
             {
                 throw;
             }
+        }
+
+        /// <summary>
+        /// HTTP Webリクエストを作成する
+        /// </summary>
+        /// <returns>作成したHTTP Webリクエスト</returns>
+        private WebRequest MakeHttpWebRequest()
+        {
+            WebRequest req = WebRequest.Create(url);
+            req.Timeout = TimeOut;
+
+            // リクエストメソッドの設定
+            if (Method != null && Method != string.Empty)
+            {
+                req.Method = Method;
+            }
+
+            // HTTPプロトコルでネットにアクセスする場合
+            if (req is HttpWebRequest)
+            {
+                // UserAgentを付加
+                ((HttpWebRequest)req).UserAgent = UserAgent;
+
+                // プロキシの設定が存在した場合、プロキシを設定
+                if (ProxyUse == ProxyConnect.OriginalSetting && ProxyServer.Length != 0)
+                {
+                    ((HttpWebRequest)req).Proxy =
+                        new WebProxy(ProxyServer, ProxyPort);
+                }
+                // プロキシ設定を使わない場合
+                else if (ProxyUse == ProxyConnect.Unuse)
+                {
+                    WebProxy proxy = new WebProxy();
+                    proxy.Address = null;
+                    ((HttpWebRequest)req).Proxy = proxy;
+                }
+
+                // 指定されたヘッダーを追加する
+                req.Headers.Add(headers);
+
+                // そのほかのヘッダを指定する
+                ((HttpWebRequest)req).KeepAlive = false;
+                req.Headers.Add("Pragma", "no-cache");
+                req.Headers.Add("Cache-Control", "no-cache");
+
+                // Web認証でアクセスする場合は
+                if (credential != null)
+                {
+                    req.Credentials = credential;
+                }
+            }
+            return req;
         }
 
         /// <summary>
@@ -418,9 +520,7 @@ namespace MiscPocketCompactLibrary.Net
 
             try
             {
-                fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
-
-                int maximum = (int)contentLength;
+                int maximum = (int)streamLength;
 
                 if (doDownloadProgressMinimum != null)
                 {
@@ -432,10 +532,39 @@ namespace MiscPocketCompactLibrary.Net
                     doSetDownloadProgressMaximum(maximum);
                 }
 
+                fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+
+                long seekPos = 0;
+
+                // ファイルに書き込む位置を決定する
+                // 206Partial Contentステータスコードが返された時はContent-Rangeヘッダを調べる
+                // それ以外のときは、先頭から書き込む
+                if (resume == true && webres is HttpWebResponse)
+                {
+                    if (((HttpWebResponse)webres).StatusCode == HttpStatusCode.PartialContent)
+                    {
+                        string contentRange = ((HttpWebResponse)webres).GetResponseHeader("Content-Range");
+                        Match m = Regex.Match(
+                            contentRange,
+                            @"bytes\s+(?:(?<first>\d*)-(?<last>\d*)|\*)/(?:(?<len>\d+)|\*)");
+                        if (m.Groups["first"].Value == string.Empty)
+                        {
+                            seekPos = 0;
+                        }
+                        else
+                        {
+                            seekPos = int.Parse(m.Groups["first"].Value);
+                        }
+                    }
+                    //書き込み位置を変更する
+                    fs.SetLength(seekPos);
+                    fs.Position = seekPos;
+                }
+
                 // 応答データをファイルに書き込む
                 Byte[] buf = new Byte[DownLoadBufferSize];
                 int count = 0;
-                int alreadyWrite = 0;
+                int alreadyWrite = (int)seekPos;
 
                 do
                 {
