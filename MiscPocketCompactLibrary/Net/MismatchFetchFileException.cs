@@ -7,11 +7,11 @@ using System;
 namespace MiscPocketCompactLibrary.Net
 {
     /// <summary>
-    /// すでにファイルをゲットしている場合の例外
+    /// ゲットすべきファイルが正しくないと思われる場合の例外
     /// </summary>
-    public class AlreadyFetchFileException : Exception
+    public class MismatchFetchFileException : Exception
     {
-        public AlreadyFetchFileException()
+        public MismatchFetchFileException()
             : base()
         {
         }

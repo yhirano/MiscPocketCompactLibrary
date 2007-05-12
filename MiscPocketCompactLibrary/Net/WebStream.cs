@@ -218,23 +218,22 @@ namespace MiscPocketCompactLibrary.Net
         WebHeaderCollection headers = new WebHeaderCollection();
 
         /// <summary>
-        /// ダウンロードするファイルのサイズ。
-        /// GetWebStream()実行時にファイルサイズが分かるので、
-        /// GetWebStream()実行前では0が返る。
-        /// リジュームの場合は残りのダウンロードサイズとなる。
-        /// </summary>
-        private long contentLength = 0;
-
-        /// <summary>
         /// ストリーム全体のファイルサイズ。
         /// リジュームの場合も全体のファイルサイズ。
         /// </summary>
         private long streamLength = 0;
 
         /// <summary>
-        /// リジュームをするか
+        /// リジュームをするか。
+        /// リジュームするという指定があった場合にtrue。
         /// </summary>
         private bool resume;
+
+        /// <summary>
+        /// リジュームできるか。
+        /// リジュームができる場合にtrue。内部フラグ。
+        /// </summary>
+        private bool resumeProgressKnown;
 
         /// <summary>
         /// ファイルレジュームの位置（すでに取得しているバイト数）
@@ -318,6 +317,7 @@ namespace MiscPocketCompactLibrary.Net
             if (alreadyGetFile == 0)
             {
                 resume = false;
+                File.Delete(fileName);
             }
             else
             {
@@ -332,6 +332,7 @@ namespace MiscPocketCompactLibrary.Net
         {
             alreadyGetFile = 0;
             resume = false;
+            resumeProgressKnown = false;
         }
 
         /// <summary>
@@ -349,28 +350,19 @@ namespace MiscPocketCompactLibrary.Net
                     return;
                 }
 
-                #region ストリーム全体のファイルサイズを得る
-                WebResponse tempRes = null;
-                try
-                {
-                    // ストリーム全体のファイルサイズを得る
-                    WebRequest tempReq = MakeHttpWebRequest();
-                    tempRes = tempReq.GetResponse();
-                    streamLength = tempRes.ContentLength;
-                }
-                finally
-                {
-                    if (tempRes != null)
-                    {
-                        tempRes.Close();
-                    }
-                }
-                #endregion
+                // ストリーム全体のファイルサイズを得る
+                streamLength = GetFileSize();
 
                 // すでにストリームのファイルが存在する場合
                 if (resume == true && streamLength == alreadyGetFile)
                 {
                     throw new AlreadyFetchFileException();
+                }
+
+                // これからゲットするファイルよりもすでに落としたファイルの方が大きい場合
+                if (resume == true && streamLength < alreadyGetFile)
+                {
+                    throw new MismatchFetchFileException();
                 }
 
                 // Webリクエストを作成する
@@ -379,7 +371,7 @@ namespace MiscPocketCompactLibrary.Net
                 if (req is HttpWebRequest)
                 {
                     // レジュームの指定がされている場合は
-                    if (resume == true)
+                    if (resume == true && resumeProgressKnown == true)
                     {
                         // バイトレンジを指定する
                         ((HttpWebRequest)req).AddRange((int)alreadyGetFile);
@@ -387,7 +379,6 @@ namespace MiscPocketCompactLibrary.Net
                 }
 
                 webres = req.GetResponse();
-                contentLength = webres.ContentLength;
                 st = webres.GetResponseStream();
             }
             catch (WebException)
@@ -465,6 +456,42 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
+        /// ストリーム全体のファイルサイズを得る
+        /// </summary>
+        /// <returns>ストリーム全体のファイルサイズ</returns>
+        private long GetFileSize()
+        {
+            WebResponse response = null;
+            long size = -1;
+
+            try
+            {
+                WebRequest request = MakeHttpWebRequest();
+                response = request.GetResponse();
+
+                size = response.ContentLength;
+
+                if (size == -1)
+                {
+                    resumeProgressKnown = false;
+                }
+                else
+                {
+                    resumeProgressKnown = true;
+                }
+            }
+            finally
+            {
+                if (response != null)
+                {
+                    response.Close();
+                }
+            }
+
+            return size;
+        }
+
+        /// <summary>
         /// ネット上からファイルをダウンロードする
         /// </summary>
         /// <param name="fileName">保存先のファイル名</param>
@@ -532,14 +559,14 @@ namespace MiscPocketCompactLibrary.Net
                     doSetDownloadProgressMaximum(maximum);
                 }
 
-                fs = new FileStream(fileName, FileMode.Create, FileAccess.Write);
+                fs = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write);
 
                 long seekPos = 0;
 
                 // ファイルに書き込む位置を決定する
                 // 206Partial Contentステータスコードが返された時はContent-Rangeヘッダを調べる
                 // それ以外のときは、先頭から書き込む
-                if (resume == true && webres is HttpWebResponse)
+                if (resume == true && resumeProgressKnown == true && webres is HttpWebResponse)
                 {
                     if (((HttpWebResponse)webres).StatusCode == HttpStatusCode.PartialContent)
                     {
