@@ -219,7 +219,7 @@ namespace MiscPocketCompactLibrary.Net
 
         /// <summary>
         /// ストリーム全体のファイルサイズ。
-        /// リジュームの場合も全体のファイルサイズ。
+        /// リジュームを指定されている場合でも、全体のファイルサイズを示す。
         /// </summary>
         private long streamLength = 0;
 
@@ -467,9 +467,25 @@ namespace MiscPocketCompactLibrary.Net
             try
             {
                 WebRequest request = MakeHttpWebRequest();
+                request.Method = "HEAD";
                 response = request.GetResponse();
 
-                size = response.ContentLength;
+                try
+                {
+                    size = long.Parse(response.Headers["Content-Length"]);
+                }
+                catch (ArgumentException)
+                {
+                    ;
+                }
+                catch (FormatException)
+                {
+                    ;
+                }
+                catch (OverflowException)
+                {
+                    ;
+                }
 
                 if (size == -1)
                 {
@@ -600,14 +616,9 @@ namespace MiscPocketCompactLibrary.Net
                     // すでに読み込んだファイルサイズ
                     alreadyWrite += count;
 
-                    // すでに読み込んだファイルサイズが全体のファイルサイズより大きくなることは
-                    // 無いはずだが、一応チェックする
-                    if (alreadyWrite < maximum)
+                    if (doSetDownloadProgressValue != null)
                     {
-                        if (doSetDownloadProgressValue != null)
-                        {
-                            doSetDownloadProgressValue(alreadyWrite);
-                        }
+                        doSetDownloadProgressValue(alreadyWrite);
                     }
 
                 } while (count != 0);
