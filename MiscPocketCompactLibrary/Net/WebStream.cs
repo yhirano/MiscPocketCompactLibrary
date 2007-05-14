@@ -29,22 +29,74 @@ namespace MiscPocketCompactLibrary.Net
         private WebResponse webres;
 
         /// <summary>
-        /// ダウンロード進捗の最小値（0）をセットするデリゲート
+        /// ファイル取得前イベントのハンドラ
         /// </summary>
-        /// <param name="minimum">ダウンロード進捗の最小値</param>
-        public delegate void SetDownloadProgressMinimumInvoker(int minimum);
+        /// <param name="sender">イベントを発信したオブジェクト</param>
+        /// <param name="e">イベント</param>
+        public delegate void FetchEventHandler(object sender, FetchEventArgs e);
 
         /// <summary>
-        /// ダウンロード進捗の最大値（ファイルサイズ）をセットするデリゲート
+        /// ファイル取得前イベント
         /// </summary>
-        /// <param name="maximum">ダウンロードの進捗の最大値</param>
-        public delegate void SetDownloadProgressMaximumInvoker(int maximum);
+        public event FetchEventHandler Fetch;
 
         /// <summary>
-        /// ダウンロード進捗の状況（すでにダウンロードしたファイルサイズ）をセットするデリゲート
+        /// ファイル取得前のイベントの実行
         /// </summary>
-        /// <param name="value">ダウンロード進捗の状況</param>
-        public delegate void SetDownloadProgressValueInvoker(int value);
+        /// <param name="e">イベント</param>
+        public void OnFetch(FetchEventArgs e)
+        {
+            if (Fetch != null)
+            {
+                Fetch(this, e);
+            }
+        }
+
+        /// <summary>
+        /// ファイル取得中イベントのハンドラ
+        /// </summary>
+        /// <param name="sender">イベントを発信したオブジェクト</param>
+        /// <param name="e">イベント</param>
+        public delegate void FetchingEventHandler(object sender, FetchEventArgs e);
+
+        /// <summary>
+        /// ファイル取得中イベント
+        /// </summary>
+        public event FetchingEventHandler Fetching;
+
+        /// <summary>
+        /// ファイル取得中のイベントの実行
+        /// </summary>
+        public void OnFetching(FetchEventArgs e)
+        {
+            if (Fetching != null)
+            {
+                Fetching(this, e);
+            }
+        }
+
+        /// <summary>
+        /// ファイル取得後イベントのハンドラ
+        /// </summary>
+        /// <param name="sender">イベントを発信したオブジェクト</param>
+        /// <param name="e">イベント</param>
+        public delegate void FetchedEventHandler(object sender, FetchEventArgs e);
+
+        /// <summary>
+        /// ファイル取得後イベント
+        /// </summary>
+        public event FetchedEventHandler Fetched;
+
+        /// <summary>
+        /// ファイル取得後のイベントの実行
+        /// </summary>
+        public void OnFetched(FetchEventArgs e)
+        {
+            if (Fetched != null)
+            {
+                Fetched(this, e);
+            }
+        }
 
         /// <summary>
         /// URL
@@ -221,7 +273,7 @@ namespace MiscPocketCompactLibrary.Net
         /// ストリーム全体のファイルサイズ。
         /// リジュームを指定されている場合でも、全体のファイルサイズを示す。
         /// </summary>
-        private long streamLength = 0;
+        private long streamLength = -1;
 
         /// <summary>
         /// リジュームをするか。
@@ -513,67 +565,11 @@ namespace MiscPocketCompactLibrary.Net
         /// <param name="fileName">保存先のファイル名</param>
         public void FetchFile(string fileName)
         {
-            try
-            {
-                FetchFile(fileName, null, null, null);
-            }
-            catch (WebException)
-            {
-                throw;
-            }
-            catch (OutOfMemoryException)
-            {
-                throw;
-            }
-            catch (IOException)
-            {
-                throw;
-            }
-            catch (UriFormatException)
-            {
-                throw;
-            }
-            catch (SocketException)
-            {
-                throw;
-            }
-            catch (ArgumentException)
-            {
-                throw;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// ネット上からファイルをダウンロードする
-        /// </summary>
-        /// <param name="fileName">保存先のファイル名</param>
-        /// <param name="doDownloadProgressMinimum">ファイルサイズの最小値（0）をセットするデリゲート</param>
-        /// <param name="doSetDownloadProgressMaximum">ファイルサイズをセットするデリゲート</param>
-        /// <param name="doSetDownloadProgressValue">ダウンロード済みのファイルサイズをセットするデリゲート</param>
-        public void FetchFile(string fileName,
-            SetDownloadProgressMinimumInvoker doDownloadProgressMinimum,
-            SetDownloadProgressMaximumInvoker doSetDownloadProgressMaximum,
-            SetDownloadProgressValueInvoker doSetDownloadProgressValue)
-        {
             FileStream fs = null;
 
             try
             {
-                int maximum = (int)streamLength;
-
-                if (doDownloadProgressMinimum != null)
-                {
-                    doDownloadProgressMinimum(0);
-                }
-
-                if (doSetDownloadProgressMaximum != null)
-                {
-                    doSetDownloadProgressMaximum(maximum);
-                }
+                OnFetch(new FetchEventArgs(0, streamLength));
 
                 fs = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write);
 
@@ -616,12 +612,16 @@ namespace MiscPocketCompactLibrary.Net
                     // すでに読み込んだファイルサイズ
                     alreadyWrite += count;
 
-                    if (doSetDownloadProgressValue != null)
-                    {
-                        doSetDownloadProgressValue(alreadyWrite);
-                    }
+                    OnFetching(new FetchEventArgs(alreadyWrite, streamLength));
 
                 } while (count != 0);
+
+                if (streamLength != -1 && streamLength > alreadyWrite)
+                {
+                    throw new WebException();
+                }
+
+                OnFetching(new FetchEventArgs(alreadyWrite, streamLength));
             }
             catch (WebException)
             {
