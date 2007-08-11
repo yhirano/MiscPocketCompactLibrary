@@ -12,7 +12,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("MiscPocketCompactLibrary")]
-[assembly: AssemblyCopyright("Copyright (C) 2005-2007 Uraroji")]
+[assembly: AssemblyCopyright("Copyright (C) 2005-2007 Y.Hirano")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: Guid("e77d6f62-c573-46cc-ba4c-06b8de0c0610")]
