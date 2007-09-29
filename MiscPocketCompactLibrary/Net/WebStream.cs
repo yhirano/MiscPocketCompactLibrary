@@ -14,6 +14,13 @@ using System.Text.RegularExpressions;
 namespace MiscPocketCompactLibrary.Net
 {
     /// <summary>
+    /// ファイル取得イベントのハンドラ
+    /// </summary>
+    /// <param name="sender">イベントを発信したオブジェクト</param>
+    /// <param name="e">イベント</param>
+    public delegate void FetchEventHandler(object sender, FetchEventArgs e);
+
+    /// <summary>
     /// Webにある情報やファイルを取得するためのクラス
     /// </summary>
     public class WebStream : Stream
@@ -27,13 +34,6 @@ namespace MiscPocketCompactLibrary.Net
         /// Webレスポンス
         /// </summary>
         private WebResponse webres;
-
-        /// <summary>
-        /// ファイル取得前イベントのハンドラ
-        /// </summary>
-        /// <param name="sender">イベントを発信したオブジェクト</param>
-        /// <param name="e">イベント</param>
-        public delegate void FetchEventHandler(object sender, FetchEventArgs e);
 
         /// <summary>
         /// ファイル取得前イベント
@@ -53,16 +53,9 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
-        /// ファイル取得中イベントのハンドラ
-        /// </summary>
-        /// <param name="sender">イベントを発信したオブジェクト</param>
-        /// <param name="e">イベント</param>
-        public delegate void FetchingEventHandler(object sender, FetchEventArgs e);
-
-        /// <summary>
         /// ファイル取得中イベント
         /// </summary>
-        public event FetchingEventHandler Fetching;
+        public event FetchEventHandler Fetching;
 
         /// <summary>
         /// ファイル取得中のイベントの実行
@@ -76,16 +69,9 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
-        /// ファイル取得後イベントのハンドラ
-        /// </summary>
-        /// <param name="sender">イベントを発信したオブジェクト</param>
-        /// <param name="e">イベント</param>
-        public delegate void FetchedEventHandler(object sender, FetchEventArgs e);
-
-        /// <summary>
         /// ファイル取得後イベント
         /// </summary>
-        public event FetchedEventHandler Fetched;
+        public event FetchEventHandler Fetched;
 
         /// <summary>
         /// ファイル取得後のイベントの実行
@@ -291,6 +277,11 @@ namespace MiscPocketCompactLibrary.Net
         /// ファイルレジュームの位置（すでに取得しているバイト数）
         /// </summary>
         private long alreadyGetFile = 0;
+
+        /// <summary>
+        /// 既に取得したファイルサイズ（推定）
+        /// </summary>
+        private int fetchedSize = 0;
 
         /// <summary>
         /// コンストラクタ
@@ -569,8 +560,6 @@ namespace MiscPocketCompactLibrary.Net
 
             try
             {
-                OnFetch(new FetchEventArgs(0, streamLength));
-
                 fs = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write);
 
                 long seekPos = 0;
@@ -611,17 +600,12 @@ namespace MiscPocketCompactLibrary.Net
                     fs.Write(buf, 0, count);
                     // すでに読み込んだファイルサイズ
                     alreadyWrite += count;
-
-                    OnFetching(new FetchEventArgs(alreadyWrite, streamLength));
-
                 } while (count != 0);
 
                 if (streamLength != -1 && streamLength > alreadyWrite)
                 {
                     throw new WebException();
                 }
-
-                OnFetching(new FetchEventArgs(alreadyWrite, streamLength));
             }
             catch (WebException)
             {
@@ -665,10 +649,7 @@ namespace MiscPocketCompactLibrary.Net
         /// </summary>
         public override bool CanRead
         {
-            get
-            {
-                return st.CanRead;
-            }
+            get { return st.CanRead; }
         }
 
         /// <summary>
@@ -678,7 +659,8 @@ namespace MiscPocketCompactLibrary.Net
         {
             get
             {
-                return st.CanSeek;
+                //return st.CanSeek;
+                return false;
             }
         }
 
@@ -703,10 +685,7 @@ namespace MiscPocketCompactLibrary.Net
         /// </summary>
         public override long Length
         {
-            get
-            {
-                return st.Length;
-            }
+            get { return st.Length; }
         }
 
         /// <summary>
@@ -714,14 +693,8 @@ namespace MiscPocketCompactLibrary.Net
         /// </summary>
         public override long Position
         {
-            get
-            {
-                return st.Position;
-            }
-            set
-            {
-                st.Position = value;
-            }
+            get { return st.Position; }
+            set { st.Position = value; }
         }
 
         /// <summary>
@@ -733,7 +706,22 @@ namespace MiscPocketCompactLibrary.Net
         /// <returns>バッファに読み取られた合計バイト数。要求しただけのバイト数を読み取ることができなかった場合、この値は要求したバイト数より小さくなります。ストリームの末尾に到達した場合は 0 (ゼロ) になることがあります。</returns>
         public override int Read(byte[] buffer, int offset, int count)
         {
-            return st.Read(buffer, offset, count);
+            int result = st.Read(buffer, offset, count);
+            if (fetchedSize <= 0)
+            {
+                OnFetch(new FetchEventArgs(fetchedSize, streamLength));
+            }
+            fetchedSize += offset + count - 1;
+            if ((streamLength != -1 && fetchedSize <= streamLength) || streamLength == -1)
+            {
+                OnFetching(new FetchEventArgs(fetchedSize, streamLength));
+            }
+            else
+            {
+                OnFetching(new FetchEventArgs(streamLength, streamLength));
+                OnFetched(new FetchEventArgs(streamLength, streamLength));
+            }
+            return result;
         }
 
         /// <summary>

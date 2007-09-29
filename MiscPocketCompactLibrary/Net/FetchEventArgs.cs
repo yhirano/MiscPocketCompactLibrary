@@ -38,10 +38,18 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
+        /// ファイルサイズは不明かを取得する
+        /// </summary>
+        public bool IsUnknownContentSize
+        {
+            get { return (contentSize < 0); }
+        }
+
+        /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="fetchedSize">ダウンロード済みのサイズ</param>
-        /// <param name="contentSize">ファイルサイズ</param>
+        /// <param name="contentSize">ファイルサイズ。不明の場合はマイナスの値を入れてください。</param>
         public FetchEventArgs(long fetchedSize, long contentSize)
         {
             this.fetchedSize = fetchedSize;
