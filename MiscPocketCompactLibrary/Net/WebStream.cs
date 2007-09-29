@@ -7,19 +7,11 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Collections;
 using System.Xml;
-using System.Text.RegularExpressions;
 
 #endregion
 
 namespace MiscPocketCompactLibrary.Net
 {
-    /// <summary>
-    /// ファイル取得イベントのハンドラ
-    /// </summary>
-    /// <param name="sender">イベントを発信したオブジェクト</param>
-    /// <param name="e">イベント</param>
-    public delegate void FetchEventHandler(object sender, FetchEventArgs e);
-
     /// <summary>
     /// Webにある情報やファイルを取得するためのクラス
     /// </summary>
@@ -36,52 +28,11 @@ namespace MiscPocketCompactLibrary.Net
         private WebResponse webres;
 
         /// <summary>
-        /// ファイル取得前イベント
+        /// Webレスポンス
         /// </summary>
-        public event FetchEventHandler Fetch;
-
-        /// <summary>
-        /// ファイル取得前のイベントの実行
-        /// </summary>
-        /// <param name="e">イベント</param>
-        public void OnFetch(FetchEventArgs e)
+        internal WebResponse Webres
         {
-            if (Fetch != null)
-            {
-                Fetch(this, e);
-            }
-        }
-
-        /// <summary>
-        /// ファイル取得中イベント
-        /// </summary>
-        public event FetchEventHandler Fetching;
-
-        /// <summary>
-        /// ファイル取得中のイベントの実行
-        /// </summary>
-        public void OnFetching(FetchEventArgs e)
-        {
-            if (Fetching != null)
-            {
-                Fetching(this, e);
-            }
-        }
-
-        /// <summary>
-        /// ファイル取得後イベント
-        /// </summary>
-        public event FetchEventHandler Fetched;
-
-        /// <summary>
-        /// ファイル取得後のイベントの実行
-        /// </summary>
-        public void OnFetched(FetchEventArgs e)
-        {
-            if (Fetched != null)
-            {
-                Fetched(this, e);
-            }
+            get { return webres; }
         }
 
         /// <summary>
@@ -202,44 +153,9 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
-        /// ダウンロード時のバッファサイズ
-        /// </summary>
-        private static long downLoadBufferSize = 0x8000;    // 32KB
-
-        /// <summary>
-        /// ダウンロード時のバッファサイズ
-        /// </summary>
-        public long DownLoadBufferSize
-        {
-            get
-            {
-                // 512B～64KB
-                if (512 <= downLoadBufferSize && downLoadBufferSize <= 0x10000)
-                {
-                    return downLoadBufferSize;
-                }
-                else
-                {
-                    return 0x8000;
-                }
-            }
-            set
-            {
-                if (512 <= value && value <= 0x10000)
-                {
-                    downLoadBufferSize = value;
-                }
-                else
-                {
-                    ;
-                }
-            }
-        }
-
-        /// <summary>
         /// Web認証情報
         /// </summary>
-        NetworkCredential credential;
+        private NetworkCredential credential;
 
         /// <summary>
         /// Web認証情報
@@ -253,13 +169,28 @@ namespace MiscPocketCompactLibrary.Net
         /// <summary>
         /// Webヘッダのコレクション
         /// </summary>
-        WebHeaderCollection headers = new WebHeaderCollection();
+        private WebHeaderCollection headers = new WebHeaderCollection();
+
+        /// <summary>
+        /// Webリクエスト
+        /// </summary>
+        private WebRequest req;
 
         /// <summary>
         /// ストリーム全体のファイルサイズ。
         /// リジュームを指定されている場合でも、全体のファイルサイズを示す。
         /// </summary>
         private long streamLength = -1;
+
+        /// <summary>
+        /// ストリーム全体のファイルサイズ。
+        /// リジュームを指定されている場合でも、全体のファイルサイズを示す。
+        /// ファイルサイズが分からない場合は-1。
+        /// </summary>
+        internal long StreamLength
+        {
+            get { return streamLength; }
+        }
 
         /// <summary>
         /// リジュームをするか。
@@ -269,9 +200,17 @@ namespace MiscPocketCompactLibrary.Net
 
         /// <summary>
         /// リジュームできるか。
-        /// リジュームができる場合にtrue。内部フラグ。
+        /// リジュームができる場合にtrue。
         /// </summary>
         private bool resumeProgressKnown;
+
+        /// <summary>
+        /// リジュームできるかを取得する。
+        /// </summary>
+        public bool CanResume
+        {
+            get { return (resume == true && resumeProgressKnown == true && (req is HttpWebRequest)); }
+        }
 
         /// <summary>
         /// ファイルレジュームの位置（すでに取得しているバイト数）
@@ -384,66 +323,44 @@ namespace MiscPocketCompactLibrary.Net
         /// <returns>HTTPレスポンスのストリーム</returns>
         public void CreateWebStream()
         {
-            try
+            // Urlがファイル指定の場合はfile streamを返す
+            if (url.IsFile == true)
             {
-                // Urlがファイル指定の場合はfile streamを返す
-                if (url.IsFile == true)
-                {
-                    st = new FileStream(url.LocalPath, FileMode.Open, FileAccess.Read);
-                    return;
-                }
+                st = new FileStream(url.LocalPath, FileMode.Open, FileAccess.Read);
+                return;
+            }
 
-                // ストリーム全体のファイルサイズを得る
-                streamLength = GetFileSize();
+            // ストリーム全体のファイルサイズを得る
+            streamLength = GetFileSize();
 
-                // すでにストリームのファイルが存在する場合
-                if (resume == true && streamLength == alreadyGetFile)
-                {
-                    throw new AlreadyFetchFileException();
-                }
+            // すでにストリームのファイルが存在する場合
+            if (resume == true && streamLength == alreadyGetFile)
+            {
+                throw new AlreadyFetchFileException();
+            }
 
-                // これからゲットするファイルよりもすでに落としたファイルの方が大きい場合
-                if (resume == true && streamLength < alreadyGetFile)
-                {
-                    throw new MismatchFetchFileException();
-                }
+            // これからゲットするファイルよりもすでに落としたファイルの方が大きい場合
+            if (resume == true && streamLength < alreadyGetFile)
+            {
+                throw new MismatchFetchFileException();
+            }
 
-                // Webリクエストを作成する
-                WebRequest req = MakeHttpWebRequest();
+            // Webリクエストを作成する
+            req = MakeHttpWebRequest();
 
+            // レジュームの指定がされている場合は
+            if (CanResume == true)
+            {
+                // ここに入る場合は必ずreqの型はHttpWebRequestとなるはずだが一応チェックする
                 if (req is HttpWebRequest)
                 {
-                    // レジュームの指定がされている場合は
-                    if (resume == true && resumeProgressKnown == true)
-                    {
-                        // バイトレンジを指定する
-                        ((HttpWebRequest)req).AddRange((int)alreadyGetFile);
-                    }
+                    // バイトレンジを指定する
+                    ((HttpWebRequest)req).AddRange((int)alreadyGetFile);
                 }
+            }
 
-                webres = req.GetResponse();
-                st = webres.GetResponseStream();
-            }
-            catch (WebException)
-            {
-                throw;
-            }
-            catch (OutOfMemoryException)
-            {
-                throw;
-            }
-            catch (IOException)
-            {
-                throw;
-            }
-            catch (UriFormatException)
-            {
-                throw;
-            }
-            catch (SocketException)
-            {
-                throw;
-            }
+            webres = req.GetResponse();
+            st = webres.GetResponseStream();
         }
 
         /// <summary>
@@ -551,100 +468,6 @@ namespace MiscPocketCompactLibrary.Net
         }
 
         /// <summary>
-        /// ネット上からファイルをダウンロードする
-        /// </summary>
-        /// <param name="fileName">保存先のファイル名</param>
-        public void FetchFile(string fileName)
-        {
-            FileStream fs = null;
-
-            try
-            {
-                fs = new FileStream(fileName, FileMode.OpenOrCreate, FileAccess.Write);
-
-                long seekPos = 0;
-
-                // ファイルに書き込む位置を決定する
-                // 206Partial Contentステータスコードが返された時はContent-Rangeヘッダを調べる
-                // それ以外のときは、先頭から書き込む
-                if (resume == true && resumeProgressKnown == true && webres is HttpWebResponse)
-                {
-                    if (((HttpWebResponse)webres).StatusCode == HttpStatusCode.PartialContent)
-                    {
-                        string contentRange = ((HttpWebResponse)webres).GetResponseHeader("Content-Range");
-                        Match m = Regex.Match(
-                            contentRange,
-                            @"bytes\s+(?:(?<first>\d*)-(?<last>\d*)|\*)/(?:(?<len>\d+)|\*)");
-                        if (m.Groups["first"].Value == string.Empty)
-                        {
-                            seekPos = 0;
-                        }
-                        else
-                        {
-                            seekPos = int.Parse(m.Groups["first"].Value);
-                        }
-                    }
-                    //書き込み位置を変更する
-                    fs.SetLength(seekPos);
-                    fs.Position = seekPos;
-                }
-
-                // 応答データをファイルに書き込む
-                Byte[] buf = new Byte[DownLoadBufferSize];
-                int count = 0;
-                int alreadyWrite = (int)seekPos;
-
-                do
-                {
-                    count = st.Read(buf, 0, buf.Length);
-                    fs.Write(buf, 0, count);
-                    // すでに読み込んだファイルサイズ
-                    alreadyWrite += count;
-                } while (count != 0);
-
-                if (streamLength != -1 && streamLength > alreadyWrite)
-                {
-                    throw new WebException();
-                }
-            }
-            catch (WebException)
-            {
-                throw;
-            }
-            catch (OutOfMemoryException)
-            {
-                throw;
-            }
-            catch (IOException)
-            {
-                throw;
-            }
-            catch (UriFormatException)
-            {
-                throw;
-            }
-            catch (SocketException)
-            {
-                throw;
-            }
-            catch (ArgumentException)
-            {
-                throw;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                throw;
-            }
-            finally
-            {
-                if (fs != null)
-                {
-                    fs.Close();
-                }
-            }
-        }
-
-        /// <summary>
         /// ストリームが読み取りをサポートするかどうかを示す値を取得します。
         /// </summary>
         public override bool CanRead
@@ -706,22 +529,7 @@ namespace MiscPocketCompactLibrary.Net
         /// <returns>バッファに読み取られた合計バイト数。要求しただけのバイト数を読み取ることができなかった場合、この値は要求したバイト数より小さくなります。ストリームの末尾に到達した場合は 0 (ゼロ) になることがあります。</returns>
         public override int Read(byte[] buffer, int offset, int count)
         {
-            int result = st.Read(buffer, offset, count);
-            if (fetchedSize <= 0)
-            {
-                OnFetch(new FetchEventArgs(fetchedSize, streamLength));
-            }
-            fetchedSize += offset + count - 1;
-            if ((streamLength != -1 && fetchedSize <= streamLength) || streamLength == -1)
-            {
-                OnFetching(new FetchEventArgs(fetchedSize, streamLength));
-            }
-            else
-            {
-                OnFetching(new FetchEventArgs(streamLength, streamLength));
-                OnFetched(new FetchEventArgs(streamLength, streamLength));
-            }
-            return result;
+            return st.Read(buffer, offset, count);
         }
 
         /// <summary>

@@ -52,8 +52,11 @@
     <Compile Include="Diagnostics\Log.cs" />
     <Compile Include="Net\AlreadyFetchFileException.cs" />
     <Compile Include="Net\FetchEventArgs.cs" />
+    <Compile Include="Net\FetchEventHandler.cs" />
     <Compile Include="Net\MismatchFetchFileException.cs" />
+    <Compile Include="Net\WebFileFetch.cs" />
     <Compile Include="Net\WebStream.cs" />
+    <Compile Include="Net\WebTextFetch.cs" />
     <Compile Include="Reflection\AssemblyUtility.cs" />
     <Compile Include="Runtime\InteropServices\MarshalEx.cs" />
     <Compile Include="Runtime\InteropServices\ProcessUtility.cs" />
