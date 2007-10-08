@@ -218,11 +218,6 @@ namespace MiscPocketCompactLibrary.Net
         private long alreadyGetFile = 0;
 
         /// <summary>
-        /// 既に取得したファイルサイズ（推定）
-        /// </summary>
-        private int fetchedSize = 0;
-
-        /// <summary>
         /// コンストラクタ
         /// </summary>
         /// <param name="url">URL</param>

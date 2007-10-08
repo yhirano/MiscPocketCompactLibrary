@@ -84,8 +84,8 @@ namespace MiscPocketCompactLibrary.Net
             {
                 sr = new StreamReader(stream, encoding);
 
-                // 応答データをファイルに書き込む
-                char[] buf = new char[DownLoadBufferSize / 2];
+                // 応答データを文字列バッファに書き込む
+                char[] buf = new char[DownLoadBufferSize];
                 int count = 0;
                 int alreadyRead = 0;
 
@@ -95,7 +95,7 @@ namespace MiscPocketCompactLibrary.Net
                 {
                     count = sr.Read(buf, 0, buf.Length);
                     sb.Append(buf);
-                    // すでに読み込んだファイルサイズ
+                    // すでに読み込んだ文字列サイズ
                     alreadyRead += encoding.GetByteCount(buf);
                     OnFetching(new FetchEventArgs(alreadyRead, stream.StreamLength));
                 } while (count != 0);
