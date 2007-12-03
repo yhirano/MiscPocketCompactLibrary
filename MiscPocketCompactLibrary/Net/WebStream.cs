@@ -451,6 +451,10 @@ namespace MiscPocketCompactLibrary.Net
                     resumeProgressKnown = true;
                 }
             }
+            catch (WebException)
+            {
+                resumeProgressKnown = false;
+            }
             finally
             {
                 if (response != null)
